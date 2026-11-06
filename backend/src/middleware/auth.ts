@@ -8,6 +8,8 @@ export interface AuthenticatedRequest extends Request {
     userId: string;
     email: string;
   };
+  body: any;
+  query: any;
 }
 
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
