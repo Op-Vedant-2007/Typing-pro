@@ -1,3 +1,4 @@
+import { apiUrl } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { History, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import type { TypingTestResult } from '../../types';
@@ -21,9 +22,9 @@ export const TypingHistory: React.FC = () => {
     try {
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(
-        `/api/typing-tests/history?page=${page}&limit=12&mode=${modeFilter}`,
-        { headers }
-      );
+      apiUrl(`/api/typing-tests/history?page=${page}&limit=12&mode=${modeFilter}`),
+      { headers }
+  );
       if (res.ok) {
         const data = await res.json();
         setTests(data.tests || []);
