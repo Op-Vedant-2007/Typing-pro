@@ -36,18 +36,35 @@ export function useTypingEngine({
   const [currentInput, setCurrentInput] = useState<string>('');
   const [history, setHistory] = useState<string[]>([]); // completed typed words
 
-  // Timing
+  // Timing state
   const [isActive, setIsActive] = useState<boolean>(false);
   const [isFinished, setIsFinished] = useState<boolean>(false);
   const [timeLeft, setTimeLeft] = useState<number>(duration);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
-  // Character counters
+  // High-precision refs so timer never restarts or stutters on keystrokes
+  const startTimeRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<any>(null);
   const totalTypedCharsRef = useRef<number>(0);
   const wordPerformancesRef = useRef<WordPerformance[]>([]);
   const timelineRef = useRef<TimelinePoint[]>([]);
   const wordStartTimeRef = useRef<number>(0);
-  const timerIntervalRef = useRef<any>(null);
+
+  // State refs to access latest values in finishTest without re-creating timers
+  const wordsRef = useRef<string[]>(words);
+  wordsRef.current = words;
+
+  const historyRef = useRef<string[]>(history);
+  historyRef.current = history;
+
+  const currentInputRef = useRef<string>(currentInput);
+  currentInputRef.current = currentInput;
+
+  const currentWordIndexRef = useRef<number>(currentWordIndex);
+  currentWordIndexRef.current = currentWordIndex;
+
+  const isFinishedRef = useRef<boolean>(isFinished);
+  isFinishedRef.current = isFinished;
 
   // Sync initial targetText
   useEffect(() => {
@@ -58,7 +75,11 @@ export function useTypingEngine({
 
   // Reset engine
   const resetEngine = useCallback(() => {
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    startTimeRef.current = null;
     setCurrentWordIndex(0);
     setCurrentInput('');
     setHistory([]);
@@ -80,66 +101,81 @@ export function useTypingEngine({
     }
   }, [currentWordIndex, words.length, mode, punctuation, numbers]);
 
-  // Calculate current exact correct characters across all completed words + current word
-  const calculateMetrics = useCallback(
-    (timeInSeconds: number) => {
-      let correctChars = 0;
+  // Metric calculation reading from latest refs
+  const computeCurrentMetrics = useCallback((timeInSeconds: number) => {
+    const activeWords = wordsRef.current;
+    const completedHistory = historyRef.current;
+    const activeInput = currentInputRef.current;
+    const activeIndex = currentWordIndexRef.current;
 
-      // 1. Check all completed words
-      for (let i = 0; i < history.length; i++) {
-        const typed = history[i] || '';
-        const target = words[i] || '';
-        const minLen = Math.min(typed.length, target.length);
+    let correctChars = 0;
 
-        for (let j = 0; j < minLen; j++) {
-          if (typed[j] === target[j]) {
-            correctChars++;
-          }
-        }
+    // 1. Check all completed words
+    for (let i = 0; i < completedHistory.length; i++) {
+      const typed = completedHistory[i] || '';
+      const target = activeWords[i] || '';
+      const minLen = Math.min(typed.length, target.length);
 
-        // If whole word matched target word, add 1 for the space keypress
-        if (typed === target) {
-          correctChars += 1;
-        }
-      }
-
-      // 2. Check currently active word
-      const currentTarget = words[currentWordIndex] || '';
-      const currentMinLen = Math.min(currentInput.length, currentTarget.length);
-      for (let j = 0; j < currentMinLen; j++) {
-        if (currentInput[j] === currentTarget[j]) {
+      for (let j = 0; j < minLen; j++) {
+        if (typed[j] === target[j]) {
           correctChars++;
         }
       }
 
-      const totalTyped = totalTypedCharsRef.current;
-      const incorrectChars = Math.max(0, totalTyped - correctChars);
-      const minutes = Math.max(0.01, timeInSeconds / 60);
+      // If whole word matched target word, count the space separator
+      if (typed === target) {
+        correctChars += 1;
+      }
+    }
 
-      const wpm = Number(((correctChars / 5) / minutes).toFixed(1));
-      const rawWpm = Number(((totalTyped / 5) / minutes).toFixed(1));
-      const accuracy = totalTyped > 0 ? Number(((correctChars / totalTyped) * 100).toFixed(1)) : 100;
+    // 2. Check current active word
+    const currentTarget = activeWords[activeIndex] || '';
+    const currentMinLen = Math.min(activeInput.length, currentTarget.length);
+    for (let j = 0; j < currentMinLen; j++) {
+      if (activeInput[j] === currentTarget[j]) {
+        correctChars++;
+      }
+    }
 
-      return {
-        correctChars,
-        incorrectChars,
-        totalTyped,
-        wpm,
-        rawWpm,
-        accuracy,
-      };
-    },
-    [history, words, currentWordIndex, currentInput]
-  );
+    const totalTyped = totalTypedCharsRef.current;
+    const incorrectChars = Math.max(0, totalTyped - correctChars);
+    const minutes = Math.max(0.01, timeInSeconds / 60);
+
+    const wpm = Number(((correctChars / 5) / minutes).toFixed(1));
+    const rawWpm = Number(((totalTyped / 5) / minutes).toFixed(1));
+    const accuracy = totalTyped > 0 ? Number(((correctChars / totalTyped) * 100).toFixed(1)) : 100;
+
+    return {
+      correctChars,
+      incorrectChars,
+      totalTyped,
+      wpm,
+      rawWpm,
+      accuracy,
+    };
+  }, []);
 
   // Complete test callback
   const finishTest = useCallback(() => {
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (isFinishedRef.current) return;
+    isFinishedRef.current = true;
+
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
     setIsActive(false);
     setIsFinished(true);
 
-    const actualDuration = mode === 'time' ? duration : Math.max(1, elapsedSeconds);
-    const metrics = calculateMetrics(actualDuration);
+    const actualDuration =
+      mode === 'time'
+        ? duration
+        : startTimeRef.current
+        ? Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000))
+        : 1;
+
+    const metrics = computeCurrentMetrics(actualDuration);
 
     // Calculate consistency from recorded timeline WPMs
     let consistency = 85.0;
@@ -159,7 +195,7 @@ export function useTypingEngine({
     const result: TypingTestResult = {
       mode,
       duration: actualDuration,
-      wordCount: history.length + (currentInput.length > 0 ? 1 : 0),
+      wordCount: historyRef.current.length + (currentInputRef.current.length > 0 ? 1 : 0),
       wpm: metrics.wpm,
       rawWpm: metrics.rawWpm,
       accuracy: metrics.accuracy,
@@ -174,49 +210,58 @@ export function useTypingEngine({
 
     soundEngine.playSuccess();
     onTestComplete(result);
-  }, [mode, duration, elapsedSeconds, calculateMetrics, history.length, currentInput.length, onTestComplete]);
+  }, [mode, duration, computeCurrentMetrics, onTestComplete]);
 
-  // Main countdown & timer loop
+  // Main high-precision continuous timer loop
+  // Note: Only depends on isActive and isFinished, NOT on keystroke input!
   useEffect(() => {
     if (isActive && !isFinished) {
+      // Tick every 200ms using Date.now() for continuous, non-drifting, non-stopping timer
       timerIntervalRef.current = setInterval(() => {
-        setElapsedSeconds((prevElapsed) => {
-          const nextElapsed = prevElapsed + 1;
-          const currentMetrics = calculateMetrics(nextElapsed);
+        if (!startTimeRef.current) return;
 
-          // Record timeline point for result graph
+        const now = Date.now();
+        const elapsedExact = (now - startTimeRef.current) / 1000;
+        const elapsedSec = Math.floor(elapsedExact);
+
+        setElapsedSeconds(elapsedSec);
+
+        // Record 1-second sample for the graph
+        if (elapsedSec > 0 && timelineRef.current.length < elapsedSec) {
+          const snapshot = computeCurrentMetrics(elapsedSec);
           timelineRef.current.push({
-            second: nextElapsed,
-            wpm: currentMetrics.wpm,
-            rawWpm: currentMetrics.rawWpm,
-            errors: currentMetrics.incorrectChars,
-          });
-
-          return nextElapsed;
-        });
-
-        if (mode === 'time') {
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              finishTest();
-              return 0;
-            }
-            return prev - 1;
+            second: elapsedSec,
+            wpm: snapshot.wpm,
+            rawWpm: snapshot.rawWpm,
+            errors: snapshot.incorrectChars,
           });
         }
-      }, 1000);
+
+        if (mode === 'time') {
+          const remaining = Math.max(0, duration - elapsedSec);
+          setTimeLeft(remaining);
+
+          if (remaining <= 0) {
+            finishTest();
+          }
+        }
+      }, 200);
     }
 
     return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
     };
-  }, [isActive, isFinished, mode, calculateMetrics, finishTest]);
+  }, [isActive, isFinished, mode, duration, finishTest, computeCurrentMetrics]);
 
   // Start test on first key
   const startTestIfNeeded = () => {
-    if (!isActive && !isFinished) {
-      setIsActive(true);
+    if (!isActive && !isFinished && !startTimeRef.current) {
+      startTimeRef.current = Date.now();
       wordStartTimeRef.current = Date.now();
+      setIsActive(true);
     }
   };
 
