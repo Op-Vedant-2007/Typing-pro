@@ -1,3 +1,4 @@
+import { apiUrl } from '../utils/api';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserSettings } from '../types';
 import { soundEngine } from '../utils/soundEngine';
@@ -45,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchMe = async (authToken: string) => {
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = await fetch(apiUrl('/api/auth/me'), {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
@@ -65,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string) => {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(apiUrl('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -83,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const res = await fetch('/api/auth/register', {
+    const res = await fetch(apiUrl('/api/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password }),
@@ -103,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const demoLogin = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/demo', {
+      const res = await fetch(apiUrl('/api/auth/demo'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -132,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateSettings = async (newSettings: Partial<UserSettings>): Promise<UserSettings> => {
     if (!token) throw new Error('Not authenticated');
 
-    const res = await fetch('/api/user/settings', {
+    const res = await fetch(apiUrl('/api/user/settings'), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -153,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (data: { name?: string; currentPassword?: string; newPassword?: string }) => {
     if (!token) throw new Error('Not authenticated');
 
-    const res = await fetch('/api/user/profile', {
+    const res = await fetch(apiUrl('/api/user/profile'), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
