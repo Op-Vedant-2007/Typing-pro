@@ -1,3 +1,4 @@
+import { apiUrl } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import {
   Calendar,
@@ -50,10 +51,10 @@ export const AnalyticsDashboard: React.FC = () => {
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [summaryRes, heatmapRes, monthlyRes, progressRes] = await Promise.all([
-        fetch('/api/typing-tests/summary', { headers }),
-        fetch('/api/analytics/heatmap', { headers }),
-        fetch('/api/analytics/monthly', { headers }),
-        fetch('/api/analytics/progress', { headers }),
+        fetch(apiUrl('/api/typing-tests/summary'), { headers }),
+        fetch(apiUrl('/api/analytics/heatmap'), { headers }),
+        fetch(apiUrl('/api/analytics/monthly'), { headers }),
+        fetch(apiUrl('/api/analytics/progress'), { headers }),
       ]);
 
       if (summaryRes.ok) setSummary(await summaryRes.json());
@@ -73,7 +74,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const fetchDaily = async (period: string) => {
     try {
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`/api/analytics/daily?period=${period}`, { headers });
+      const res = await fetch(apiUrl(`/api/analytics/daily?period=${period}`), { headers});
       if (res.ok) {
         setDailyData(await res.json());
       }
