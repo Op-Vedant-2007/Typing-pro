@@ -1,0 +1,110 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String          @id @default(uuid())
+  name         String
+  email        String          @unique
+  passwordHash String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  typingTests    TypingTest[]
+  wordStatistics WordStatistic[]
+  dailyActivity  DailyActivity[]
+  userSettings   UserSettings?
+
+  @@map("users")
+}
+
+model TypingTest {
+  id                  String   @id @default(uuid())
+  userId              String
+  mode                String   // "time", "words", "quote", "sentence", "custom", "weak_words", "zen"
+  duration            Int      // scheduled duration or elapsed seconds
+  wordCount           Int      // target or actual word count
+  wpm                 Float
+  rawWpm              Float
+  accuracy            Float
+  correctCharacters   Int
+  incorrectCharacters Int
+  totalCharacters     Int
+  practiceTime        Int      // seconds spent
+  consistency         Float    @default(0.0)
+  wordsData           String?  // JSON string: [{ word, typed, mistakes, durationMs, isMistake }]
+  timelineData        String?  // JSON string: [{ second, wpm, rawWpm, errors }]
+  createdAt           DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, mode])
+  @@map("typing_tests")
+}
+
+model WordStatistic {
+  id                String   @id @default(uuid())
+  userId            String
+  word              String
+  attempts          Int      @default(0)
+  mistakes          Int      @default(0)
+  errorRate         Float    @default(0.0) // percentage 0 - 100
+  averageTypingTime Float    @default(0.0) // milliseconds
+  lastPracticed     DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, word])
+  @@index([userId, errorRate])
+  @@index([userId, mistakes])
+  @@map("word_statistics")
+}
+
+model DailyActivity {
+  id              String   @id @default(uuid())
+  userId          String
+  activityDate    String   // ISO Date "YYYY-MM-DD"
+  practiceSeconds Int      @default(0)
+  testsCompleted  Int      @default(0)
+  wordsTyped      Int      @default(0)
+  avgWpm          Float    @default(0.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activityDate])
+  @@index([userId, activityDate])
+  @@map("daily_activities")
+}
+
+model UserSettings {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  theme                 String   @default("typeflow-dark") // typeflow-dark, midnight-cyber, retro-amber, forest-mint, dracula-night, minimal-light
+  soundEnabled          Boolean  @default(true)
+  soundTheme            String   @default("mechanical") // mechanical, typewriter, pop, mute
+  fontSize              String   @default("medium") // small, medium, large, xlarge
+  fontFamily            String   @default("JetBrains Mono") // JetBrains Mono, Fira Code, Roboto Mono
+  caretStyle            String   @default("line") // line, block, underline, outline
+  preferredTestDuration Int      @default(30)
+  preferredWordCount    Int      @default(25)
+  preferredMode         String   @default("time")
+  preferredLanguage     String   @default("english")
+  punctuation           Boolean  @default(false)
+  numbers               Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
