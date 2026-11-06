@@ -8,7 +8,7 @@ import {
   Infinity as InfinityIcon,
   RotateCcw,
   Sparkles,
-  Command,
+  MousePointerClick,
 } from 'lucide-react';
 import type { TestMode, TypingTestResult } from '../../types';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
@@ -51,20 +51,11 @@ export const TypingArea: React.FC<TypingAreaProps> = ({
   onTestComplete,
   onOpenWeakWords,
 }) => {
-  const { fontSize, caretStyle } = useTheme();
+  const { fontSize } = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const wordsContainerRef = useRef<HTMLDivElement>(null);
+  const activeWordRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState<boolean>(true);
-
-  // Active letter reference to calculate caret position
-  const activeLetterRef = useRef<HTMLSpanElement>(null);
-  const [caretPos, setCaretPos] = useState<{ left: number; top: number; width: number; height: number }>({
-    left: 0,
-    top: 0,
-    width: 2,
-    height: 24,
-  });
 
   const {
     words,
@@ -73,195 +64,209 @@ export const TypingArea: React.FC<TypingAreaProps> = ({
     history,
     isActive,
     timeLeft,
-    wpm,
-    rawWpm,
-    accuracy,
     handleKeyDown,
-    handleInputChange,
   } = useTypingEngine({
     targetText,
     mode,
     duration,
     targetWordCount: wordCount,
+    punctuation,
+    numbers,
     onTestComplete,
     onRestart,
     onNewText,
   });
 
-  // Keep input focused
+  // Keep input focused automatically
   useEffect(() => {
     inputRef.current?.focus();
   }, [targetText]);
+
+  // Global keydown refocus so user can type anytime
+  useEffect(() => {
+    const handleGlobalKeyDown = () => {
+      // Don't steal focus if typing in an input/textarea elsewhere
+      if (
+        document.activeElement &&
+        (document.activeElement.tagName === 'INPUT' ||
+          document.activeElement.tagName === 'TEXTAREA') &&
+        document.activeElement !== inputRef.current
+      ) {
+        return;
+      }
+
+      if (inputRef.current && document.activeElement !== inputRef.current) {
+        inputRef.current.focus();
+        setIsFocused(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   const handleContainerClick = () => {
     inputRef.current?.focus();
     setIsFocused(true);
   };
 
-  // Update smooth caret coordinates
+  // Smooth auto-scroll active line to keep current line visible
   useEffect(() => {
-    if (activeLetterRef.current && wordsContainerRef.current) {
-      const parentRect = wordsContainerRef.current.getBoundingClientRect();
-      const letterRect = activeLetterRef.current.getBoundingClientRect();
+    if (activeWordRef.current && wordsContainerRef.current) {
+      const container = wordsContainerRef.current;
+      const activeWord = activeWordRef.current;
+      const offsetTop = activeWord.offsetTop;
 
-      setCaretPos({
-        left: letterRect.left - parentRect.left,
-        top: letterRect.top - parentRect.top,
-        width: letterRect.width || 10,
-        height: letterRect.height || 26,
-      });
-
-      // Smooth auto-scroll active line into view
-      const activeWordElem = activeLetterRef.current.closest('.word-element') as HTMLElement;
-      if (activeWordElem && wordsContainerRef.current) {
-        const wordOffsetTop = activeWordElem.offsetTop;
-        if (wordOffsetTop > 100) {
-          wordsContainerRef.current.scrollTop = wordOffsetTop - 50;
-        } else {
-          wordsContainerRef.current.scrollTop = 0;
-        }
+      // When word is beyond line 1, scroll smoothly
+      if (offsetTop > 60) {
+        container.scrollTop = offsetTop - 45;
+      } else {
+        container.scrollTop = 0;
       }
     }
-  }, [currentWordIndex, currentInput]);
+  }, [currentWordIndex]);
 
-  // Determine font size CSS class
+  // Font size classes
   const fontSizeClass =
     fontSize === 'small'
-      ? 'text-lg leading-relaxed'
-      : fontSize === 'large'
-      ? 'text-2xl leading-loose'
+      ? 'text-lg leading-loose'
+      : fontSize === 'medium'
+      ? 'text-xl leading-loose'
       : fontSize === 'xlarge'
       ? 'text-3xl leading-loose'
-      : 'text-xl leading-relaxed';
+      : 'text-2xl leading-loose';
 
   return (
     <div
-      ref={containerRef}
       onClick={handleContainerClick}
       className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center my-auto py-8 px-4 cursor-text select-none focus:outline-none"
     >
-      {/* Invisible actual input */}
+      {/* Hidden input catching keystrokes */}
       <input
         ref={inputRef}
         type="text"
-        value={currentInput}
-        onChange={handleInputChange}
+        value=""
+        onChange={() => {}}
         onKeyDown={handleKeyDown}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        className="opacity-0 absolute -top-9999px left-0 h-0 w-0 pointer-events-none"
+        className="opacity-0 absolute -top-[9999px] left-0 h-0 w-0 pointer-events-none"
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck="false"
       />
 
-      {/* Mode & Config Selector Bar */}
-      <div className={`flex flex-wrap items-center justify-center gap-4 mb-10 transition-opacity duration-300 ${isActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      {/* Mode & Config Selector Bar (Monkeytype style) */}
+      <div
+        className={`flex flex-wrap items-center justify-center gap-4 mb-8 transition-opacity duration-200 ${
+          isActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+      >
         {/* Test Mode Selector */}
-        <div className="flex items-center gap-1 bg-bg-secondary p-1 rounded-xl border border-border-color/60 text-xs">
+        <div className="flex items-center gap-1 bg-[#2c2e31] p-1 rounded-xl text-xs">
           <button
             onClick={() => setMode('time')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
               mode === 'time'
-                ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                : 'text-[#646669] hover:text-[#d1d0c5]'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Time</span>
+            <span>time</span>
           </button>
 
           <button
             onClick={() => setMode('words')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
               mode === 'words'
-                ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                : 'text-[#646669] hover:text-[#d1d0c5]'
             }`}
           >
             <Type className="w-3.5 h-3.5" />
-            <span>Words</span>
+            <span>words</span>
           </button>
 
           <button
             onClick={() => setMode('quote')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
               mode === 'quote'
-                ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                : 'text-[#646669] hover:text-[#d1d0c5]'
             }`}
           >
             <QuoteIcon className="w-3.5 h-3.5" />
-            <span>Quote</span>
+            <span>quote</span>
           </button>
 
           <button
             onClick={() => setMode('sentence')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
               mode === 'sentence'
-                ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                : 'text-[#646669] hover:text-[#d1d0c5]'
             }`}
           >
             <AlignLeft className="w-3.5 h-3.5" />
-            <span>Sentence</span>
+            <span>sentence</span>
           </button>
 
           <button
             onClick={onOpenWeakWords}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
               mode === 'weak_words'
-                ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                : 'text-amber-400 hover:text-amber-300'
+                ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                : 'text-[#e2b714]/80 hover:text-[#e2b714]'
             }`}
           >
             <Target className="w-3.5 h-3.5" />
-            <span>Weak Words</span>
+            <span>weak words</span>
           </button>
 
           <button
             onClick={() => setMode('zen')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
               mode === 'zen'
-                ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                : 'text-[#646669] hover:text-[#d1d0c5]'
             }`}
           >
             <InfinityIcon className="w-3.5 h-3.5" />
-            <span>Zen</span>
+            <span>zen</span>
           </button>
         </div>
 
         {/* Duration / Word Count Options */}
         {mode === 'time' && (
-          <div className="flex items-center gap-1 bg-bg-secondary p-1 rounded-xl border border-border-color/60 text-xs">
+          <div className="flex items-center gap-1 bg-[#2c2e31] p-1 rounded-xl text-xs">
             {[15, 30, 60, 120].map((d) => (
               <button
                 key={d}
                 onClick={() => setDuration(d)}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                   duration === d
-                    ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                    : 'text-text-secondary hover:text-text-primary'
+                    ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                    : 'text-[#646669] hover:text-[#d1d0c5]'
                 }`}
               >
-                {d}s
+                {d}
               </button>
             ))}
           </div>
         )}
 
         {mode === 'words' && (
-          <div className="flex items-center gap-1 bg-bg-secondary p-1 rounded-xl border border-border-color/60 text-xs">
+          <div className="flex items-center gap-1 bg-[#2c2e31] p-1 rounded-xl text-xs">
             {[10, 25, 50, 100].map((w) => (
               <button
                 key={w}
                 onClick={() => setWordCount(w)}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                   wordCount === w
-                    ? 'bg-accent text-white shadow-sm shadow-accent/30'
-                    : 'text-text-secondary hover:text-text-primary'
+                    ? 'bg-[#e2b714] text-[#323437] font-bold shadow-sm'
+                    : 'text-[#646669] hover:text-[#d1d0c5]'
                 }`}
               >
                 {w}
@@ -270,111 +275,52 @@ export const TypingArea: React.FC<TypingAreaProps> = ({
           </div>
         )}
 
-        {/* Toggles (Punctuation, Numbers) */}
+        {/* Punctuation & Numbers Toggles */}
         {(mode === 'time' || mode === 'words') && (
-          <div className="flex items-center gap-1 bg-bg-secondary p-1 rounded-xl border border-border-color/60 text-xs">
+          <div className="flex items-center gap-1 bg-[#2c2e31] p-1 rounded-xl text-xs">
             <button
               onClick={() => setPunctuation(!punctuation)}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                 punctuation
-                  ? 'bg-accent/20 text-accent border border-accent/40'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'text-[#e2b714] font-bold'
+                  : 'text-[#646669] hover:text-[#d1d0c5]'
               }`}
             >
-              @ punctuation
+              punctuation
             </button>
             <button
               onClick={() => setNumbers(!numbers)}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                 numbers
-                  ? 'bg-accent/20 text-accent border border-accent/40'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'text-[#e2b714] font-bold'
+                  : 'text-[#646669] hover:text-[#d1d0c5]'
               }`}
             >
-              # numbers
+              numbers
             </button>
           </div>
         )}
       </div>
 
-      {/* Live HUD Counters */}
-      <div className="w-full flex items-center justify-between mb-4 px-2 text-sm font-mono-typing">
-        <div className="flex items-center gap-4">
-          {mode === 'time' ? (
-            <span className="text-3xl font-bold text-accent transition-all">
-              {timeLeft}
-            </span>
-          ) : (
-            <span className="text-xl font-bold text-accent transition-all">
-              {currentWordIndex} / {words.length}
-            </span>
-          )}
-        </div>
-
-        {isActive && (
-          <div className="flex items-center gap-6 text-xs text-text-secondary animate-in fade-in duration-200">
-            <div className="flex items-center gap-1.5">
-              <span className="text-text-muted">wpm:</span>
-              <span className="font-bold text-text-primary text-base">{wpm}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-text-muted">raw:</span>
-              <span className="font-bold text-text-primary text-base">{rawWpm}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-text-muted">acc:</span>
-              <span className="font-bold text-text-primary text-base">{accuracy}%</span>
-            </div>
-          </div>
+      {/* Countdown Timer or Word Progress (No real-time speed clutter!) */}
+      <div className="w-full flex items-center justify-start mb-3 px-3 font-mono-typing">
+        {mode === 'time' ? (
+          <span className="text-3xl font-bold text-[#e2b714] tracking-tight transition-all">
+            {timeLeft}
+          </span>
+        ) : (
+          <span className="text-xl font-bold text-[#e2b714] tracking-tight transition-all">
+            {currentWordIndex} / {wordCount || words.length}
+          </span>
         )}
       </div>
 
-      {/* Main Words Typing Window */}
-      <div className="relative w-full rounded-2xl bg-bg-card/40 border border-border-color/50 p-6 sm:p-8 backdrop-blur-sm min-h-[180px] max-h-[260px] overflow-hidden">
-        {/* Unfocused Blur Overlay */}
-        {!isFocused && (
-          <div
-            onClick={handleContainerClick}
-            className="absolute inset-0 z-20 flex items-center justify-center bg-bg-primary/75 backdrop-blur-xs cursor-pointer animate-in fade-in duration-150"
-          >
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-bg-secondary border border-border-color text-xs text-text-secondary shadow-lg">
-              <Command className="w-4 h-4 text-accent" />
-              <span>Click or press any key to focus</span>
-            </div>
-          </div>
-        )}
-
-        {/* Words Container with Relative Position for Smooth Caret */}
+      {/* Main Typing Area - 3 visible lines with smooth auto-scroll */}
+      <div className="w-full relative py-2">
         <div
           ref={wordsContainerRef}
-          className={`relative max-h-[200px] overflow-hidden scroll-smooth font-mono-typing ${fontSizeClass} flex flex-wrap gap-x-3 gap-y-2 select-none`}
+          className={`h-[150px] overflow-hidden scroll-smooth font-mono-typing ${fontSizeClass} flex flex-wrap gap-x-3 gap-y-1.5 select-none transition-all`}
         >
-          {/* Smooth Animated Caret */}
-          {isFocused && (
-            <div
-              className={`pointer-events-none z-10 ${
-                caretStyle === 'block'
-                  ? 'caret-block'
-                  : caretStyle === 'underline'
-                  ? 'caret-underline'
-                  : caretStyle === 'outline'
-                  ? 'caret-outline'
-                  : 'caret-line'
-              } ${!isActive ? 'caret-blink' : ''}`}
-              style={{
-                transform: `translate(${caretPos.left}px, ${caretPos.top}px)`,
-                width:
-                  caretStyle === 'block' || caretStyle === 'outline'
-                    ? `${caretPos.width}px`
-                    : caretStyle === 'underline'
-                    ? `${caretPos.width}px`
-                    : '2.5px',
-                height: `${caretPos.height}px`,
-              }}
-            />
-          )}
-
-          {/* Render All Words */}
           {words.map((targetWord, wordIdx) => {
             const isCompleted = wordIdx < currentWordIndex;
             const isCurrent = wordIdx === currentWordIndex;
@@ -383,50 +329,67 @@ export const TypingArea: React.FC<TypingAreaProps> = ({
             // 1. Completed Word
             if (isCompleted) {
               const typedWord = history[wordIdx] || '';
-              const hadMistake = typedWord !== targetWord;
+              const targetLetters = targetWord.split('');
+              const typedLetters = typedWord.split('');
 
               return (
-                <span
-                  key={wordIdx}
-                  className={`word-element inline-block transition-colors ${
-                    hadMistake
-                      ? 'text-error border-b border-error/50'
-                      : 'text-text-primary/75'
-                  }`}
-                >
-                  {targetWord}
-                </span>
+                <div key={wordIdx} className="inline-block whitespace-nowrap">
+                  {targetLetters.map((char, charIdx) => {
+                    const typedChar = typedLetters[charIdx];
+                    const isCorrect = typedChar !== undefined && typedChar === char;
+
+                    return (
+                      <span
+                        key={charIdx}
+                        className={isCorrect ? 'text-[#d1d0c5]' : 'text-[#ca4754]'}
+                      >
+                        {char}
+                      </span>
+                    );
+                  })}
+                  {/* Extra letters typed beyond target word */}
+                  {typedLetters.slice(targetLetters.length).map((extraChar, extraIdx) => (
+                    <span
+                      key={`extra-${extraIdx}`}
+                      className="text-[#7e2a33] underline decoration-[#ca4754]"
+                    >
+                      {extraChar}
+                    </span>
+                  ))}
+                </div>
               );
             }
 
-            // 2. Active Word
+            // 2. Active Word Currently Being Typed
             if (isCurrent) {
-              const inputLetters = currentInput.split('');
               const targetLetters = targetWord.split('');
+              const inputLetters = currentInput.split('');
               const extraLetters = inputLetters.slice(targetLetters.length);
 
               return (
-                <span
+                <div
                   key={wordIdx}
-                  className="word-element inline-block relative font-medium"
+                  ref={activeWordRef}
+                  className="inline-block whitespace-nowrap"
                 >
                   {targetLetters.map((char, charIdx) => {
                     const typedChar = inputLetters[charIdx];
                     const isTyped = typedChar !== undefined;
                     const isCorrect = isTyped && typedChar === char;
                     const isIncorrect = isTyped && typedChar !== char;
-                    const isCaretHere = charIdx === inputLetters.length;
+                    const isCurrentLetter = charIdx === inputLetters.length;
 
                     return (
                       <span
                         key={charIdx}
-                        ref={isCaretHere ? activeLetterRef : null}
                         className={`transition-colors ${
                           isCorrect
-                            ? 'text-accent font-semibold'
+                            ? 'text-[#d1d0c5]'
                             : isIncorrect
-                            ? 'text-error bg-error/20 rounded-xs'
-                            : 'text-text-muted'
+                            ? 'text-[#ca4754] bg-[#ca4754]/20 rounded-xs'
+                            : isCurrentLetter
+                            ? 'text-[#646669] border-b-2 border-[#e2b714]'
+                            : 'text-[#646669]'
                         }`}
                       >
                         {char}
@@ -435,46 +398,31 @@ export const TypingArea: React.FC<TypingAreaProps> = ({
                   })}
 
                   {/* Overtyped extra characters */}
-                  {extraLetters.map((extraChar, extraIdx) => {
-                    const isCaretHere =
-                      targetLetters.length + extraIdx + 1 === inputLetters.length;
-                    return (
-                      <span
-                        key={`extra-${extraIdx}`}
-                        ref={isCaretHere ? activeLetterRef : null}
-                        className="text-error/80 bg-error/30 rounded-xs"
-                      >
-                        {extraChar}
-                      </span>
-                    );
-                  })}
-
-                  {/* Caret anchor when input is empty or at the end */}
-                  {inputLetters.length >= targetLetters.length && (
+                  {extraLetters.map((extraChar, extraIdx) => (
                     <span
-                      ref={
-                        inputLetters.length >= targetLetters.length
-                          ? activeLetterRef
-                          : null
-                      }
-                      className="inline-block w-[1px] opacity-0"
+                      key={`extra-${extraIdx}`}
+                      className="text-[#7e2a33] bg-[#7e2a33]/25 border-b-2 border-[#ca4754]"
                     >
+                      {extraChar}
+                    </span>
+                  ))}
+
+                  {/* Underline on space if cursor is at the end of word */}
+                  {inputLetters.length >= targetLetters.length && (
+                    <span className="border-b-2 border-[#e2b714] inline-block w-2">
                       &nbsp;
                     </span>
                   )}
-                </span>
+                </div>
               );
             }
 
-            // 3. Upcoming Words
+            // 3. Upcoming Words (Muted gray)
             if (isUpcoming) {
               return (
-                <span
-                  key={wordIdx}
-                  className="word-element inline-block text-text-muted transition-colors opacity-70"
-                >
+                <div key={wordIdx} className="inline-block whitespace-nowrap text-[#646669]">
                   {targetWord}
-                </span>
+                </div>
               );
             }
 
@@ -484,48 +432,59 @@ export const TypingArea: React.FC<TypingAreaProps> = ({
 
         {/* Quote Author attribution */}
         {mode === 'quote' && quoteInfo && (
-          <div className="mt-4 pt-3 border-t border-border-color/40 text-right text-xs text-text-secondary italic">
+          <div className="mt-3 text-right text-xs text-[#646669] italic">
             — {quoteInfo.author}
           </div>
         )}
       </div>
 
+      {/* Subtle Unfocused Indicator Below Text (Never blocking the words!) */}
+      {!isFocused && (
+        <div
+          onClick={handleContainerClick}
+          className="mt-3 py-1 px-3 rounded-lg bg-[#2c2e31] text-xs text-[#e2b714] flex items-center gap-1.5 cursor-pointer animate-pulse"
+        >
+          <MousePointerClick className="w-3.5 h-3.5" />
+          <span>Click here or press any key to focus</span>
+        </div>
+      )}
+
       {/* Action Buttons & Shortcut Hints Footer */}
-      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 text-xs text-text-muted">
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 text-xs text-[#646669]">
         <div className="flex items-center gap-3">
           <button
             onClick={onRestart}
             title="Restart Test (Tab)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-secondary hover:bg-bg-card hover:text-text-primary border border-border-color/60 transition-all text-text-secondary"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2c2e31] hover:text-[#d1d0c5] transition-all"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Restart</span>
+            <span>restart</span>
           </button>
 
           <button
             onClick={onNewText}
             title="New Text (Shift + Enter)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-secondary hover:bg-bg-card hover:text-text-primary border border-border-color/60 transition-all text-text-secondary"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2c2e31] hover:text-[#d1d0c5] transition-all"
           >
-            <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span>New Text</span>
+            <Sparkles className="w-3.5 h-3.5 text-[#e2b714]" />
+            <span>new text</span>
           </button>
         </div>
 
         {/* Keyboard shortcut hints */}
         <div className="flex items-center gap-3 text-[11px] font-mono-typing">
           <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border-color text-text-secondary">
+            <kbd className="px-1.5 py-0.5 rounded bg-[#2c2e31] text-[#646669]">
               tab
             </kbd>{' '}
             restart
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border-color text-text-secondary">
+            <kbd className="px-1.5 py-0.5 rounded bg-[#2c2e31] text-[#646669]">
               shift
             </kbd>
             +
-            <kbd className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border-color text-text-secondary">
+            <kbd className="px-1.5 py-0.5 rounded bg-[#2c2e31] text-[#646669]">
               enter
             </kbd>{' '}
             new test

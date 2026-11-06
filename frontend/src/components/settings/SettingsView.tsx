@@ -21,8 +21,6 @@ export const SettingsView: React.FC = () => {
     setFontSize,
     fontFamily,
     setFontFamily,
-    caretStyle,
-    setCaretStyle,
   } = useTheme();
 
   const { settings, updateSettings } = useAuth();
@@ -68,20 +66,20 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="w-full max-w-4xl mx-auto py-6 px-4 animate-in fade-in duration-300">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+        <h1 className="text-2xl font-bold tracking-tight text-[#d1d0c5]">
           Settings & Customization
         </h1>
-        <p className="text-xs text-text-secondary mt-1">
+        <p className="text-xs text-[#646669] mt-1">
           Personalize themes, sound synthesis, typography, and test preferences
         </p>
       </div>
 
       <div className="space-y-8">
         {/* 1. Theme Selection */}
-        <section className="bg-bg-card rounded-2xl border border-border-color p-6 shadow-sm">
+        <section className="bg-[#2c2e31] rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <Palette className="w-5 h-5 text-accent" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-primary">
+            <Palette className="w-5 h-5 text-[#e2b714]" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#d1d0c5]">
               Theme Palette
             </h2>
           </div>
@@ -93,8 +91,8 @@ export const SettingsView: React.FC = () => {
                 onClick={() => setTheme(t.id)}
                 className={`relative flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left group ${
                   theme === t.id
-                    ? 'border-accent bg-accent/10 shadow-sm'
-                    : 'border-border-color bg-bg-secondary hover:border-text-muted'
+                    ? 'border-[#e2b714] bg-[#e2b714]/10 shadow-sm'
+                    : 'border-[#3e4145] bg-[#323437] hover:border-[#646669]'
                 }`}
               >
                 <div
@@ -107,45 +105,45 @@ export const SettingsView: React.FC = () => {
                   />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-text-primary truncate">
+                  <span className="text-xs font-semibold text-[#d1d0c5] truncate">
                     {t.name}
                   </span>
-                  <span className="text-[10px] text-text-muted font-mono">
+                  <span className="text-[10px] text-[#646669] font-mono">
                     {t.id}
                   </span>
                 </div>
                 {theme === t.id && (
-                  <Check className="w-4 h-4 text-accent ml-auto shrink-0" />
+                  <Check className="w-4 h-4 text-[#e2b714] ml-auto shrink-0" />
                 )}
               </button>
             ))}
           </div>
         </section>
 
-        {/* 2. Typography & Caret Style */}
-        <section className="bg-bg-card rounded-2xl border border-border-color p-6 shadow-sm">
+        {/* 2. Typography */}
+        <section className="bg-[#2c2e31] rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <Type className="w-5 h-5 text-accent" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-primary">
-              Typography & Caret
+            <Type className="w-5 h-5 text-[#e2b714]" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#d1d0c5]">
+              Typography & Font Size
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Font Family */}
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-2">
+              <label className="block text-xs font-medium text-[#646669] mb-2">
                 Monospace Font
               </label>
               <div className="space-y-1.5">
-                {['JetBrains Mono', 'Fira Code', 'Roboto Mono'].map((font) => (
+                {['Roboto Mono', 'JetBrains Mono', 'Fira Code'].map((font) => (
                   <button
                     key={font}
                     onClick={() => setFontFamily(font)}
                     className={`w-full py-2 px-3 rounded-xl text-xs font-mono border text-left transition-all flex items-center justify-between ${
                       fontFamily === font
-                        ? 'bg-accent/15 border-accent text-accent font-bold'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:text-text-primary'
+                        ? 'bg-[#e2b714]/15 border-[#e2b714] text-[#e2b714] font-bold'
+                        : 'bg-[#323437] border-[#3e4145] text-[#646669] hover:text-[#d1d0c5]'
                     }`}
                   >
                     <span>{font}</span>
@@ -157,53 +155,26 @@ export const SettingsView: React.FC = () => {
 
             {/* Font Size */}
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-2">
+              <label className="block text-xs font-medium text-[#646669] mb-2">
                 Font Size
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'small', label: 'Small (18px)' },
-                  { id: 'medium', label: 'Medium (22px)' },
-                  { id: 'large', label: 'Large (26px)' },
-                  { id: 'xlarge', label: 'X-Large (30px)' },
+                  { id: 'medium', label: 'Medium (20px)' },
+                  { id: 'large', label: 'Large (24px - standard)' },
+                  { id: 'xlarge', label: 'X-Large (28px)' },
                 ].map((s) => (
                   <button
                     key={s.id}
                     onClick={() => setFontSize(s.id)}
                     className={`py-2 px-2.5 rounded-xl text-xs border text-center transition-all ${
                       fontSize === s.id
-                        ? 'bg-accent text-white border-accent font-semibold'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:text-text-primary'
+                        ? 'bg-[#e2b714] text-[#323437] border-[#e2b714] font-bold'
+                        : 'bg-[#323437] border-[#3e4145] text-[#646669] hover:text-[#d1d0c5]'
                     }`}
                   >
                     {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Caret Style */}
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-2">
-                Caret Indicator
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'line', label: 'Line (|)' },
-                  { id: 'block', label: 'Block (█)' },
-                  { id: 'underline', label: 'Underline (_)' },
-                  { id: 'outline', label: 'Outline (▢)' },
-                ].map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setCaretStyle(c.id)}
-                    className={`py-2 px-2.5 rounded-xl text-xs border text-center transition-all ${
-                      caretStyle === c.id
-                        ? 'bg-accent text-white border-accent font-semibold'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    {c.label}
                   </button>
                 ))}
               </div>
@@ -212,11 +183,11 @@ export const SettingsView: React.FC = () => {
         </section>
 
         {/* 3. Audio & Sound Effects */}
-        <section className="bg-bg-card rounded-2xl border border-border-color p-6 shadow-sm">
+        <section className="bg-[#2c2e31] rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Volume2 className="w-5 h-5 text-accent" />
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-text-primary">
+              <Volume2 className="w-5 h-5 text-[#e2b714]" />
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-[#d1d0c5]">
                 Keyboard Sound Effects
               </h2>
             </div>
@@ -225,8 +196,8 @@ export const SettingsView: React.FC = () => {
               onClick={() => handleSoundToggle(!soundEnabled)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                 soundEnabled
-                  ? 'bg-accent/20 border-accent text-accent'
-                  : 'bg-bg-secondary border-border-color text-text-muted'
+                  ? 'bg-[#e2b714]/20 border-[#e2b714] text-[#e2b714]'
+                  : 'bg-[#323437] border-[#3e4145] text-[#646669]'
               }`}
             >
               {soundEnabled ? (
@@ -255,41 +226,41 @@ export const SettingsView: React.FC = () => {
                 onClick={() => handleSoundThemeChange(snd.id)}
                 className={`p-3 rounded-xl border text-left transition-all ${
                   soundTheme === snd.id
-                    ? 'border-accent bg-accent/10 shadow-xs'
-                    : 'border-border-color bg-bg-secondary hover:border-text-muted'
+                    ? 'border-[#e2b714] bg-[#e2b714]/10 shadow-xs'
+                    : 'border-[#3e4145] bg-[#323437] hover:border-[#646669]'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-text-primary">
+                  <span className="text-xs font-semibold text-[#d1d0c5]">
                     {snd.name}
                   </span>
-                  {soundTheme === snd.id && <Check className="w-3.5 h-3.5 text-accent" />}
+                  {soundTheme === snd.id && <Check className="w-3.5 h-3.5 text-[#e2b714]" />}
                 </div>
-                <span className="text-[11px] text-text-muted block">{snd.desc}</span>
+                <span className="text-[11px] text-[#646669] block">{snd.desc}</span>
               </button>
             ))}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-border-color/50 flex items-center justify-between">
-            <span className="text-xs text-text-secondary">
-              Synthesized in real-time via Web Audio API (Zero lag, zero external assets)
+          <div className="mt-4 pt-4 border-t border-[#3e4145]/50 flex items-center justify-between">
+            <span className="text-xs text-[#646669]">
+              Synthesized in real-time via Web Audio API (Zero lag)
             </span>
             <button
               type="button"
               onClick={handleTestSound}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-secondary hover:bg-bg-card border border-border-color text-xs text-text-primary transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#323437] hover:text-[#d1d0c5] border border-[#3e4145] text-xs text-[#646669] transition-colors"
             >
-              <Play className="w-3 h-3 text-accent" />
+              <Play className="w-3 h-3 text-[#e2b714]" />
               <span>Test Keystroke</span>
             </button>
           </div>
         </section>
 
         {/* 4. Default Test Preferences */}
-        <section className="bg-bg-card rounded-2xl border border-border-color p-6 shadow-sm">
+        <section className="bg-[#2c2e31] rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <Sliders className="w-5 h-5 text-accent" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-primary">
+            <Sliders className="w-5 h-5 text-[#e2b714]" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#d1d0c5]">
               Default Test Preferences
             </h2>
           </div>
@@ -297,7 +268,7 @@ export const SettingsView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Preferred Mode */}
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-2">
+              <label className="block text-xs font-medium text-[#646669] mb-2">
                 Preferred Mode
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -307,8 +278,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => handleModeChange(m)}
                     className={`py-1.5 px-2 rounded-lg text-xs capitalize border transition-all ${
                       preferredMode === m
-                        ? 'bg-accent text-white border-accent font-semibold'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:text-text-primary'
+                        ? 'bg-[#e2b714] text-[#323437] border-[#e2b714] font-bold'
+                        : 'bg-[#323437] border-[#3e4145] text-[#646669] hover:text-[#d1d0c5]'
                     }`}
                   >
                     {m}
@@ -319,7 +290,7 @@ export const SettingsView: React.FC = () => {
 
             {/* Preferred Duration */}
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-2">
+              <label className="block text-xs font-medium text-[#646669] mb-2">
                 Preferred Duration (Time Mode)
               </label>
               <div className="grid grid-cols-4 gap-1.5">
@@ -329,8 +300,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => handleDurationChange(dur)}
                     className={`py-1.5 px-1 rounded-lg text-xs font-mono font-semibold border transition-all ${
                       preferredDuration === dur
-                        ? 'bg-accent text-white border-accent'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:text-text-primary'
+                        ? 'bg-[#e2b714] text-[#323437] border-[#e2b714] font-bold'
+                        : 'bg-[#323437] border-[#3e4145] text-[#646669] hover:text-[#d1d0c5]'
                     }`}
                   >
                     {dur}s
@@ -341,7 +312,7 @@ export const SettingsView: React.FC = () => {
 
             {/* Preferred Word Count */}
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-2">
+              <label className="block text-xs font-medium text-[#646669] mb-2">
                 Preferred Word Count (Words Mode)
               </label>
               <div className="grid grid-cols-4 gap-1.5">
@@ -351,8 +322,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => handleWordCountChange(cnt)}
                     className={`py-1.5 px-1 rounded-lg text-xs font-mono font-semibold border transition-all ${
                       preferredWordCount === cnt
-                        ? 'bg-accent text-white border-accent'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:text-text-primary'
+                        ? 'bg-[#e2b714] text-[#323437] border-[#e2b714] font-bold'
+                        : 'bg-[#323437] border-[#3e4145] text-[#646669] hover:text-[#d1d0c5]'
                     }`}
                   >
                     {cnt}
@@ -364,53 +335,53 @@ export const SettingsView: React.FC = () => {
         </section>
 
         {/* 5. Keyboard Shortcuts Reference */}
-        <section className="bg-bg-card rounded-2xl border border-border-color p-6 shadow-sm">
+        <section className="bg-[#2c2e31] rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <Keyboard className="w-5 h-5 text-accent" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-primary">
+            <Keyboard className="w-5 h-5 text-[#e2b714]" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#d1d0c5]">
               Keyboard Shortcuts Reference
             </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary border border-border-color/60">
-              <span className="text-text-secondary">Restart Current Test</span>
-              <kbd className="px-2 py-0.5 rounded bg-bg-card border border-border-color text-accent font-mono">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#323437] border border-[#3e4145]">
+              <span className="text-[#646669]">Restart Current Test</span>
+              <kbd className="px-2 py-0.5 rounded bg-[#2c2e31] border border-[#3e4145] text-[#e2b714] font-mono">
                 Tab
               </kbd>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary border border-border-color/60">
-              <span className="text-text-secondary">Generate New Text</span>
-              <kbd className="px-2 py-0.5 rounded bg-bg-card border border-border-color text-accent font-mono">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#323437] border border-[#3e4145]">
+              <span className="text-[#646669]">Generate New Text</span>
+              <kbd className="px-2 py-0.5 rounded bg-[#2c2e31] border border-[#3e4145] text-[#e2b714] font-mono">
                 Shift + Enter
               </kbd>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary border border-border-color/60">
-              <span className="text-text-secondary">Start or Confirm Result</span>
-              <kbd className="px-2 py-0.5 rounded bg-bg-card border border-border-color text-accent font-mono">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#323437] border border-[#3e4145]">
+              <span className="text-[#646669]">Start or Confirm Result</span>
+              <kbd className="px-2 py-0.5 rounded bg-[#2c2e31] border border-[#3e4145] text-[#e2b714] font-mono">
                 Enter
               </kbd>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary border border-border-color/60">
-              <span className="text-text-secondary">Exit Modal / Custom Screen</span>
-              <kbd className="px-2 py-0.5 rounded bg-bg-card border border-border-color text-accent font-mono">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#323437] border border-[#3e4145]">
+              <span className="text-[#646669]">Exit Modal / Custom Screen</span>
+              <kbd className="px-2 py-0.5 rounded bg-[#2c2e31] border border-[#3e4145] text-[#e2b714] font-mono">
                 Esc
               </kbd>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary border border-border-color/60">
-              <span className="text-text-secondary">Quick Open Settings</span>
-              <kbd className="px-2 py-0.5 rounded bg-bg-card border border-border-color text-accent font-mono">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#323437] border border-[#3e4145]">
+              <span className="text-[#646669]">Quick Open Settings</span>
+              <kbd className="px-2 py-0.5 rounded bg-[#2c2e31] border border-[#3e4145] text-[#e2b714] font-mono">
                 Ctrl + Shift + P
               </kbd>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary border border-border-color/60">
-              <span className="text-text-secondary">Targeted Weak Words Practice</span>
-              <kbd className="px-2 py-0.5 rounded bg-bg-card border border-border-color text-accent font-mono">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#323437] border border-[#3e4145]">
+              <span className="text-[#646669]">Targeted Weak Words Practice</span>
+              <kbd className="px-2 py-0.5 rounded bg-[#2c2e31] border border-[#3e4145] text-[#e2b714] font-mono">
                 Ctrl + Shift + W
               </kbd>
             </div>

@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { TestMode, TypingTestResult, WordPerformance, TimelinePoint } from '../types';
 import { soundEngine } from '../utils/soundEngine';
+import { getRandomWords } from '../utils/textGenerator';
 
 interface TypingEngineProps {
   targetText: string;
   mode: TestMode;
   duration: number; // in seconds (for time mode)
   targetWordCount: number; // for words mode
+  punctuation: boolean;
+  numbers: boolean;
   onTestComplete: (result: TypingTestResult) => void;
   onRestart: () => void;
   onNewText: () => void;
@@ -17,81 +20,128 @@ export function useTypingEngine({
   mode,
   duration,
   targetWordCount,
+  punctuation,
+  numbers,
   onTestComplete,
   onRestart,
   onNewText,
 }: TypingEngineProps) {
-  // Target words breakdown
-  const words = useRef<string[]>([]);
-  words.current = targetText.split(/\s+/).filter((w) => w.length > 0);
+  // Words state (allows infinite dynamic appending in time/zen modes)
+  const [words, setWords] = useState<string[]>(() => {
+    return targetText.split(/\s+/).filter((w) => w.length > 0);
+  });
 
-  // User input state
+  // User typing state
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
   const [currentInput, setCurrentInput] = useState<string>('');
   const [history, setHistory] = useState<string[]>([]); // completed typed words
-  const [wordMistakes, setWordMistakes] = useState<number[]>([]); // mistake count per word
 
-  // Timing & metrics
+  // Timing
   const [isActive, setIsActive] = useState<boolean>(false);
   const [isFinished, setIsFinished] = useState<boolean>(false);
   const [timeLeft, setTimeLeft] = useState<number>(duration);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
-  // Live performance stats
-  const [wpm, setWpm] = useState<number>(0);
-  const [rawWpm, setRawWpm] = useState<number>(0);
-  const [accuracy, setAccuracy] = useState<number>(100);
-  const [correctChars, setCorrectChars] = useState<number>(0);
-  const [incorrectChars, setIncorrectChars] = useState<number>(0);
-  const [totalTypedChars, setTotalTypedChars] = useState<number>(0);
-
-  // Timeline tracking
+  // Character counters
+  const totalTypedCharsRef = useRef<number>(0);
+  const wordPerformancesRef = useRef<WordPerformance[]>([]);
   const timelineRef = useRef<TimelinePoint[]>([]);
   const wordStartTimeRef = useRef<number>(0);
-  const wordPerformancesRef = useRef<WordPerformance[]>([]);
   const timerIntervalRef = useRef<any>(null);
 
-  // Reset engine when target text or duration changes
+  // Sync initial targetText
+  useEffect(() => {
+    const initialWords = targetText.split(/\s+/).filter((w) => w.length > 0);
+    setWords(initialWords);
+    resetEngine();
+  }, [targetText, duration, mode]);
+
+  // Reset engine
   const resetEngine = useCallback(() => {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     setCurrentWordIndex(0);
     setCurrentInput('');
     setHistory([]);
-    setWordMistakes([]);
     setIsActive(false);
     setIsFinished(false);
     setTimeLeft(duration);
     setElapsedSeconds(0);
-    setWpm(0);
-    setRawWpm(0);
-    setAccuracy(100);
-    setCorrectChars(0);
-    setIncorrectChars(0);
-    setTotalTypedChars(0);
-    timelineRef.current = [];
+    totalTypedCharsRef.current = 0;
     wordPerformancesRef.current = [];
+    timelineRef.current = [];
     wordStartTimeRef.current = 0;
   }, [duration]);
 
+  // Infinite word appending: whenever user is within 35 words of the end in time/zen mode
   useEffect(() => {
-    resetEngine();
-  }, [targetText, duration, mode, resetEngine]);
+    if ((mode === 'time' || mode === 'zen') && currentWordIndex >= words.length - 35) {
+      const moreWords = getRandomWords(100, punctuation, numbers);
+      setWords((prev) => [...prev, ...moreWords]);
+    }
+  }, [currentWordIndex, words.length, mode, punctuation, numbers]);
 
-  // Finish test callback
+  // Calculate current exact correct characters across all completed words + current word
+  const calculateMetrics = useCallback(
+    (timeInSeconds: number) => {
+      let correctChars = 0;
+
+      // 1. Check all completed words
+      for (let i = 0; i < history.length; i++) {
+        const typed = history[i] || '';
+        const target = words[i] || '';
+        const minLen = Math.min(typed.length, target.length);
+
+        for (let j = 0; j < minLen; j++) {
+          if (typed[j] === target[j]) {
+            correctChars++;
+          }
+        }
+
+        // If whole word matched target word, add 1 for the space keypress
+        if (typed === target) {
+          correctChars += 1;
+        }
+      }
+
+      // 2. Check currently active word
+      const currentTarget = words[currentWordIndex] || '';
+      const currentMinLen = Math.min(currentInput.length, currentTarget.length);
+      for (let j = 0; j < currentMinLen; j++) {
+        if (currentInput[j] === currentTarget[j]) {
+          correctChars++;
+        }
+      }
+
+      const totalTyped = totalTypedCharsRef.current;
+      const incorrectChars = Math.max(0, totalTyped - correctChars);
+      const minutes = Math.max(0.01, timeInSeconds / 60);
+
+      const wpm = Number(((correctChars / 5) / minutes).toFixed(1));
+      const rawWpm = Number(((totalTyped / 5) / minutes).toFixed(1));
+      const accuracy = totalTyped > 0 ? Number(((correctChars / totalTyped) * 100).toFixed(1)) : 100;
+
+      return {
+        correctChars,
+        incorrectChars,
+        totalTyped,
+        wpm,
+        rawWpm,
+        accuracy,
+      };
+    },
+    [history, words, currentWordIndex, currentInput]
+  );
+
+  // Complete test callback
   const finishTest = useCallback(() => {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     setIsActive(false);
     setIsFinished(true);
 
     const actualDuration = mode === 'time' ? duration : Math.max(1, elapsedSeconds);
-    const elapsedMinutes = actualDuration / 60;
+    const metrics = calculateMetrics(actualDuration);
 
-    const finalWpm = Number(((correctChars / 5) / elapsedMinutes).toFixed(1));
-    const finalRawWpm = Number(((totalTypedChars / 5) / elapsedMinutes).toFixed(1));
-    const finalAccuracy =
-      totalTypedChars > 0 ? Number(((correctChars / totalTypedChars) * 100).toFixed(1)) : 100;
-
-    // Calculate consistency based on standard deviation of timeline WPMs
+    // Calculate consistency from recorded timeline WPMs
     let consistency = 85.0;
     const timeline = timelineRef.current;
     if (timeline.length > 2) {
@@ -110,12 +160,12 @@ export function useTypingEngine({
       mode,
       duration: actualDuration,
       wordCount: history.length + (currentInput.length > 0 ? 1 : 0),
-      wpm: finalWpm,
-      rawWpm: finalRawWpm,
-      accuracy: finalAccuracy,
-      correctCharacters: correctChars,
-      incorrectCharacters: incorrectChars,
-      totalCharacters: totalTypedChars,
+      wpm: metrics.wpm,
+      rawWpm: metrics.rawWpm,
+      accuracy: metrics.accuracy,
+      correctCharacters: metrics.correctChars,
+      incorrectCharacters: metrics.incorrectChars,
+      totalCharacters: metrics.totalTyped,
       practiceTime: actualDuration,
       consistency,
       wordsData: wordPerformancesRef.current,
@@ -124,45 +174,22 @@ export function useTypingEngine({
 
     soundEngine.playSuccess();
     onTestComplete(result);
-  }, [
-    mode,
-    duration,
-    elapsedSeconds,
-    correctChars,
-    totalTypedChars,
-    incorrectChars,
-    history.length,
-    currentInput.length,
-    onTestComplete,
-  ]);
+  }, [mode, duration, elapsedSeconds, calculateMetrics, history.length, currentInput.length, onTestComplete]);
 
-  // Main countdown / elapsed timer loop
+  // Main countdown & timer loop
   useEffect(() => {
     if (isActive && !isFinished) {
       timerIntervalRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => {
-          const nextElapsed = prev + 1;
-          const currentElapsedMinutes = nextElapsed / 60;
+        setElapsedSeconds((prevElapsed) => {
+          const nextElapsed = prevElapsed + 1;
+          const currentMetrics = calculateMetrics(nextElapsed);
 
-          // Compute instantaneous WPM
-          const currentWpm =
-            currentElapsedMinutes > 0
-              ? Number(((correctChars / 5) / currentElapsedMinutes).toFixed(1))
-              : 0;
-          const currentRawWpm =
-            currentElapsedMinutes > 0
-              ? Number(((totalTypedChars / 5) / currentElapsedMinutes).toFixed(1))
-              : 0;
-
-          setWpm(currentWpm);
-          setRawWpm(currentRawWpm);
-
-          // Record timeline point
+          // Record timeline point for result graph
           timelineRef.current.push({
             second: nextElapsed,
-            wpm: currentWpm,
-            rawWpm: currentRawWpm,
-            errors: incorrectChars,
+            wpm: currentMetrics.wpm,
+            rawWpm: currentMetrics.rawWpm,
+            errors: currentMetrics.incorrectChars,
           });
 
           return nextElapsed;
@@ -183,9 +210,9 @@ export function useTypingEngine({
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [isActive, isFinished, mode, correctChars, totalTypedChars, incorrectChars, finishTest]);
+  }, [isActive, isFinished, mode, calculateMetrics, finishTest]);
 
-  // Start test on first keypress
+  // Start test on first key
   const startTestIfNeeded = () => {
     if (!isActive && !isFinished) {
       setIsActive(true);
@@ -193,7 +220,7 @@ export function useTypingEngine({
     }
   };
 
-  // Handle keydown from typing input
+  // Keyboard navigation & typing handler
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isFinished) return;
 
@@ -210,78 +237,62 @@ export function useTypingEngine({
       return;
     }
 
-    // Space key: commit word
+    // Space key: commit current word
     if (e.key === ' ') {
       e.preventDefault();
-      if (currentInput.trim().length === 0) return; // ignore leading spaces
+      if (currentInput.trim().length === 0) return; // avoid empty spaces
 
       startTestIfNeeded();
       soundEngine.playKey(true);
+      totalTypedCharsRef.current += 1; // count the space keystroke
 
-      const targetWord = words.current[currentWordIndex] || '';
+      const targetWord = words[currentWordIndex] || '';
       const typedWord = currentInput;
+      const isMistake = typedWord !== targetWord;
       const wordDuration = Math.max(100, Date.now() - wordStartTimeRef.current);
-      const isWordMistake = typedWord !== targetWord;
 
-      // Count character accuracy for the word
-      let wordCorrect = 0;
-      let wordIncorrect = 0;
-      const maxLen = Math.max(targetWord.length, typedWord.length);
-
+      let wordMistakesCount = 0;
+      const maxLen = Math.max(typedWord.length, targetWord.length);
       for (let i = 0; i < maxLen; i++) {
-        if (i < typedWord.length && i < targetWord.length) {
-          if (typedWord[i] === targetWord[i]) {
-            wordCorrect++;
-          } else {
-            wordIncorrect++;
-          }
-        } else {
-          wordIncorrect++;
+        if (typedWord[i] !== targetWord[i]) {
+          wordMistakesCount++;
         }
       }
-
-      // Add 1 for the space character
-      wordCorrect += 1;
-
-      setCorrectChars((c) => c + wordCorrect);
-      setIncorrectChars((inc) => inc + wordIncorrect);
-      setTotalTypedChars((tot) => tot + typedWord.length + 1);
 
       // Record word performance for Weak Words Analysis
       wordPerformancesRef.current.push({
         word: targetWord,
         typed: typedWord,
-        mistakes: wordIncorrect,
-        isMistake: isWordMistake,
+        mistakes: wordMistakesCount,
+        isMistake,
         durationMs: wordDuration,
       });
 
-      // Update history and advance
-      const nextWordIndex = currentWordIndex + 1;
+      const nextIndex = currentWordIndex + 1;
       setHistory((prev) => [...prev, typedWord]);
       setCurrentInput('');
-      setCurrentWordIndex(nextWordIndex);
+      setCurrentWordIndex(nextIndex);
       wordStartTimeRef.current = Date.now();
 
-      // Check if finished by words or quotes
-      if (mode !== 'time' && mode !== 'zen') {
-        if (nextWordIndex >= words.current.length || (targetWordCount && nextWordIndex >= targetWordCount)) {
-          finishTest();
-        }
+      // Check test completion in words mode
+      if (mode === 'words' && targetWordCount && nextIndex >= targetWordCount) {
+        finishTest();
       }
       return;
     }
 
-    // Backspace handling
+    // Backspace key
     if (e.key === 'Backspace') {
       startTestIfNeeded();
       soundEngine.playKey();
 
-      if (currentInput.length === 0 && currentWordIndex > 0) {
-        // Option to step back into previous word if it was wrong
+      if (currentInput.length > 0) {
+        setCurrentInput((prev) => prev.slice(0, -1));
+      } else if (currentWordIndex > 0) {
+        // Step back into previous word if it had errors
         const prevIndex = currentWordIndex - 1;
         const prevTyped = history[prevIndex];
-        const prevTarget = words.current[prevIndex];
+        const prevTarget = words[prevIndex];
 
         if (prevTyped && prevTyped !== prevTarget) {
           e.preventDefault();
@@ -294,11 +305,14 @@ export function useTypingEngine({
       return;
     }
 
-    // Standard character keypress
+    // Standard character key
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
       startTestIfNeeded();
 
-      const targetWord = words.current[currentWordIndex] || '';
+      totalTypedCharsRef.current += 1; // count character keystroke
+
+      const targetWord = words[currentWordIndex] || '';
       const nextCharIndex = currentInput.length;
       const expectedChar = targetWord[nextCharIndex];
 
@@ -306,29 +320,21 @@ export function useTypingEngine({
         soundEngine.playKey();
       } else {
         soundEngine.playError();
-        // Record mistake for this word
-        setWordMistakes((prev) => {
-          const arr = [...prev];
-          arr[currentWordIndex] = (arr[currentWordIndex] || 0) + 1;
-          return arr;
-        });
       }
 
-      // Check if this was the last character of the last word in words/quote mode
+      const nextInput = currentInput + e.key;
+      setCurrentInput(nextInput);
+
+      // In quotes or sentence mode: check if finished on last char of last word
       if (
-        mode !== 'time' &&
-        mode !== 'zen' &&
-        currentWordIndex === words.current.length - 1 &&
-        nextCharIndex === targetWord.length - 1 &&
-        e.key === expectedChar
+        (mode === 'quote' || mode === 'sentence') &&
+        currentWordIndex === words.length - 1 &&
+        nextInput === targetWord
       ) {
-        // Last letter typed accurately!
-        setCorrectChars((c) => c + 1);
-        setTotalTypedChars((t) => t + 1);
         wordPerformancesRef.current.push({
           word: targetWord,
-          typed: currentInput + e.key,
-          mistakes: wordMistakes[currentWordIndex] || 0,
+          typed: nextInput,
+          mistakes: 0,
           isMistake: false,
           durationMs: Date.now() - wordStartTimeRef.current,
         });
@@ -337,15 +343,8 @@ export function useTypingEngine({
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isFinished) return;
-    const val = e.target.value;
-    if (val.endsWith(' ')) return; // handled by onKeyDown
-    setCurrentInput(val);
-  };
-
   return {
-    words: words.current,
+    words,
     currentWordIndex,
     currentInput,
     history,
@@ -353,14 +352,7 @@ export function useTypingEngine({
     isFinished,
     timeLeft,
     elapsedSeconds,
-    wpm,
-    rawWpm,
-    accuracy,
-    correctChars,
-    incorrectChars,
-    totalTypedChars,
     handleKeyDown,
-    handleInputChange,
     resetEngine,
     finishTest,
   };

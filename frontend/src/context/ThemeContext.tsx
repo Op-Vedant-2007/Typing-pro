@@ -10,12 +10,12 @@ export interface ThemeOption {
 }
 
 export const AVAILABLE_THEMES: ThemeOption[] = [
-  { id: 'typeflow-dark', name: 'TypeFlow Dark', bg: '#0e1117', accent: '#8b5cf6', card: '#1b2129' },
-  { id: 'midnight-cyber', name: 'Midnight Cyber', bg: '#080c14', accent: '#06b6d4', card: '#131e30' },
-  { id: 'retro-amber', name: 'Retro Amber', bg: '#120f0c', accent: '#f59e0b', card: '#241c16' },
-  { id: 'forest-mint', name: 'Forest Mint', bg: '#0b1411', accent: '#10b981', card: '#182823' },
-  { id: 'dracula-night', name: 'Dracula Night', bg: '#1e1f29', accent: '#ff79c6', card: '#343746' },
-  { id: 'minimal-light', name: 'Minimal Light', bg: '#f8fafc', accent: '#6366f1', card: '#ffffff' },
+  { id: 'serika-dark', name: 'Serika Dark (Monkeytype)', bg: '#323437', accent: '#e2b714', card: '#2c2e31' },
+  { id: 'carbon', name: 'Carbon', bg: '#1e1e1e', accent: '#f66e0d', card: '#252525' },
+  { id: 'dracula', name: 'Dracula', bg: '#282a36', accent: '#bd93f9', card: '#343746' },
+  { id: 'matrix', name: 'Matrix', bg: '#000000', accent: '#15ff00', card: '#121812' },
+  { id: 'nord', name: 'Nord', bg: '#2e3440', accent: '#88c0d0', card: '#3b4252' },
+  { id: 'minimal-light', name: 'Minimal Light', bg: '#f8fafc', accent: '#e2b714', card: '#ffffff' },
 ];
 
 interface ThemeContextType {
@@ -25,8 +25,6 @@ interface ThemeContextType {
   setFontSize: (s: string) => void;
   fontFamily: string;
   setFontFamily: (f: string) => void;
-  caretStyle: string;
-  setCaretStyle: (c: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -35,19 +33,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { settings, updateSettings } = useAuth();
 
   const [theme, setThemeState] = useState<string>(() => {
-    return localStorage.getItem('typeflow_theme') || 'typeflow-dark';
+    return localStorage.getItem('typeflow_theme') || 'serika-dark';
   });
 
   const [fontSize, setFontSizeState] = useState<string>(() => {
-    return localStorage.getItem('typeflow_font_size') || 'medium';
+    return localStorage.getItem('typeflow_font_size') || 'large';
   });
 
   const [fontFamily, setFontFamilyState] = useState<string>(() => {
-    return localStorage.getItem('typeflow_font_family') || 'JetBrains Mono';
-  });
-
-  const [caretStyle, setCaretStyleState] = useState<string>(() => {
-    return localStorage.getItem('typeflow_caret_style') || 'line';
+    return localStorage.getItem('typeflow_font_family') || 'Roboto Mono';
   });
 
   // Sync from userSettings if logged in
@@ -56,14 +50,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (settings.theme && settings.theme !== theme) setThemeState(settings.theme);
       if (settings.fontSize && settings.fontSize !== fontSize) setFontSizeState(settings.fontSize);
       if (settings.fontFamily && settings.fontFamily !== fontFamily) setFontFamilyState(settings.fontFamily);
-      if (settings.caretStyle && settings.caretStyle !== caretStyle) setCaretStyleState(settings.caretStyle);
     }
   }, [settings]);
 
   // Apply theme class to documentElement
   useEffect(() => {
     const root = document.documentElement;
-    AVAILABLE_THEMES.forEach((t) => root.classList.remove(t.id));
+    AVAILABLE_THEMES.forEach((t) => {
+      root.classList.remove(t.id);
+    });
+    root.classList.remove('typeflow-dark');
     root.classList.add(theme);
     localStorage.setItem('typeflow_theme', theme);
   }, [theme]);
@@ -90,12 +86,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (settings) updateSettings({ fontFamily: newFont });
   };
 
-  const setCaretStyle = (newCaret: string) => {
-    setCaretStyleState(newCaret);
-    localStorage.setItem('typeflow_caret_style', newCaret);
-    if (settings) updateSettings({ caretStyle: newCaret });
-  };
-
   return (
     <ThemeContext.Provider
       value={{
@@ -105,8 +95,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setFontSize,
         fontFamily,
         setFontFamily,
-        caretStyle,
-        setCaretStyle,
       }}
     >
       {children}
