@@ -1,5 +1,7 @@
 # TypeFlow ⚡
 
+🚀 Live Demo: https://typeflow-frontend.onrender.com
+
 > **TypeFlow** is a modern, full-stack typing practice and personalized learning web application inspired by Monkeytype, built with high performance, beautiful aesthetics, and intelligent learning features.
 
 TypeFlow goes beyond simple speed tests by actively identifying your **weak words**, analyzing typing bottlenecks (mistyped letters, slow character pairings, hesitation duration), and **automatically generating targeted drill tests** that dynamically repeat difficult words in both repetitive and natural sentence contexts.
