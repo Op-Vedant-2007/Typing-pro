@@ -1,8 +1,9 @@
 node_modules/
-dist/
-.DS_Store
-*.log
 .env
-dev.db
-dev.db-journal
-*.tsbuildinfo
+.env.local
+.env.production
+__pycache__/
+.venv/
+venv/
+dist/
+build/
